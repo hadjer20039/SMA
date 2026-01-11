@@ -1,6 +1,8 @@
 package agents;
 
-import model.Product; 
+import model.Product;
+import utils.Utils; 
+
 import jade.core.Agent;
 import jade.core.behaviours.*;
 import jade.domain.DFService;
@@ -8,7 +10,6 @@ import jade.domain.FIPAAgentManagement.*;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
-import jade.lang.acl.UnreadableException;
 import java.util.*;
 
 public class RobotAgent extends Agent {
@@ -26,10 +27,10 @@ public class RobotAgent extends Agent {
         int totalSkillsAvailable = 5; 
         for(int i=0; i<3; i++) {
             int skillId = (int)(Math.random() * totalSkillsAvailable);
-            skills.put(String.valueOf(skillId), 0.5 + (Math.random() * 0.5));
+            skills.put(String.valueOf(skillId), 0.5 + (Math.random() * 0.49));
         }
         
-        System.out.println("Robot " + getLocalName() + " prêt. Skills: " + skills.keySet());
+        System.out.println("Robot " + getLocalName() + " prêt. Skills: " + skills);
 
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
@@ -54,9 +55,15 @@ public class RobotAgent extends Agent {
 
     public double calculateMakespan() {
         double totalTime = 0;
-
         for (Product p : productQueue) {
-            totalTime += lambda3 * 1.5; 
+            String skill = p.getNextMissingSkill();
+            if (skill != null && skills.containsKey(skill)) {
+                double prob = skills.get(skill);
+                double E = (1.0 - prob) / prob;
+                totalTime += lambda3 * (1.0 + E);
+            } else {
+                totalTime += lambda3; 
+            }
         }
         return totalTime;
     }
@@ -65,13 +72,11 @@ public class RobotAgent extends Agent {
         public void action() {
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM); 
             ACLMessage msg = receive(mt);
-            
             if (msg != null) {
                 try {
                     Object content = msg.getContentObject();
                     if (content instanceof Product) {
-                        Product p = (Product) content;
-                        myAgent.addBehaviour(new ManagerBehaviour(p));
+                        myAgent.addBehaviour(new ManagerBehaviour((Product) content));
                     }
                 } catch (Exception e) { e.printStackTrace(); }
             } else { block(); }
@@ -88,7 +93,11 @@ public class RobotAgent extends Agent {
             if (neededSkill == null) {
                 ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
                 msg.addReceiver(new jade.core.AID("Atelier", jade.core.AID.ISLOCALNAME));
-                try { msg.setContentObject(product); send(msg); } catch(Exception e){}
+                try { 
+                    msg.setContentObject(product); 
+                    Utils.totalMessages.incrementAndGet(); 
+                    send(msg); 
+                } catch(Exception e){}
                 return;
             }
 
@@ -100,17 +109,17 @@ public class RobotAgent extends Agent {
             try {
                 DFAgentDescription[] result = DFService.search(myAgent, template);
                 if (result.length > 0) {
-                     System.out.println(">>> [Manager " + getLocalName() + "] Enchère pour Produit " + product.getId() + " (Skill " + neededSkill + ") avec " + result.length + " participants.");
-                     
                      ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
                      for (DFAgentDescription agent : result) cfp.addReceiver(agent.getName());
                      cfp.setContent("skill-" + neededSkill);
-                     cfp.setConversationId("nego-" + product.getId()); // ID unique pour suivre la convo
+                     cfp.setConversationId("nego-" + product.getId() + "-" + System.currentTimeMillis());
+                     
+                     Utils.totalMessages.incrementAndGet(); 
                      send(cfp);
                      
-                     myAgent.addBehaviour(new CollectProposalsBehaviour(result.length, product, "nego-" + product.getId()));
+                     myAgent.addBehaviour(new CollectProposalsBehaviour(result.length, product, cfp.getConversationId()));
                 } else {
-                    System.out.println("!!! [Manager " + getLocalName() + "] Personne pour skill " + neededSkill);
+                    System.out.println("!!! [Manager " + getLocalName() + "] Personne pour skill " + neededSkill + ".");
                 }
             } catch (FIPAException e) { e.printStackTrace(); }
         }
@@ -121,7 +130,7 @@ public class RobotAgent extends Agent {
         private String conversationId;
         
         public CollectProposalsBehaviour(int expected, Product p, String convId) {
-            super(RobotAgent.this, 1500); 
+            super(RobotAgent.this, 1000);
             this.product = p;
             this.conversationId = convId;
         }
@@ -137,22 +146,23 @@ public class RobotAgent extends Agent {
              
              ACLMessage msg = myAgent.receive(mt);
              while(msg != null) {
-                 double time = Double.parseDouble(msg.getContent());
-                 if (time < bestTime) {
-                     bestTime = time;
-                     bestProposal = msg;
-                 }
+                 try {
+                    double time = Double.parseDouble(msg.getContent());
+                    if (time < bestTime) {
+                        bestTime = time;
+                        bestProposal = msg;
+                    }
+                 } catch(Exception e){}
                  msg = myAgent.receive(mt);
              }
              
              if (bestProposal != null) {
-                 System.out.println("+++ [Manager " + getLocalName() + "] Vainqueur pour " + product.getId() + " est " + bestProposal.getSender().getLocalName());
                  ACLMessage accept = bestProposal.createReply();
                  accept.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
                  try { accept.setContentObject(product); } catch(Exception e){}
+                 
+                 Utils.totalMessages.incrementAndGet(); 
                  myAgent.send(accept);
-             } else {
-                 System.out.println("--- [Manager " + getLocalName() + "] Aucune proposition reçue pour " + product.getId());
              }
         }
     }
@@ -167,19 +177,19 @@ public class RobotAgent extends Agent {
             
             if (msg != null) {
                 if (msg.getPerformative() == ACLMessage.CFP) {
-                    // On propose un temps
                     double duration = calculateMakespan();
                     ACLMessage reply = msg.createReply();
                     reply.setPerformative(ACLMessage.PROPOSE);
                     reply.setContent(String.valueOf(duration));
+                    
+                    Utils.totalMessages.incrementAndGet(); 
                     send(reply);
-                    System.out.println("... [Responder " + getLocalName() + "] J'ai proposé " + duration);
                 } 
                 else if (msg.getPerformative() == ACLMessage.ACCEPT_PROPOSAL) {
                     try {
                         Product p = (Product) msg.getContentObject();
                         productQueue.add(p);
-                        System.out.println("VVV [Worker " + getLocalName() + "] J'ai gagné le job " + p.getId() + ". File: " + productQueue.size());
+                        System.out.println("VVV [Worker " + getLocalName() + "] J'ai gagné " + p.getId() + " (File: " + productQueue.size() + ")");
                     } catch (Exception e) {}
                 }
             } else { block(); }
@@ -196,14 +206,20 @@ public class RobotAgent extends Agent {
                 
                 if (skills.containsKey(skillToApply)) {
                     isWorking = true;
-                    System.out.println("... [Worker " + getLocalName() + "] Travail en cours sur " + currentProduct.getId() + " (Skill "+skillToApply+")");
                     
                     myAgent.addBehaviour(new WakerBehaviour(myAgent, lambda3) {
                         protected void onWake() {
-                            currentProduct.setSkillDone(skillToApply);
-                            System.out.println("*** [Worker " + getLocalName() + "] FINI skill " + skillToApply + " sur " + currentProduct.getId());
+                            double prob = skills.get(skillToApply);
                             
-                            myAgent.addBehaviour(new ManagerBehaviour(currentProduct));
+                            if (Math.random() < prob) {
+                                currentProduct.setSkillDone(skillToApply);
+                                System.out.println("*** [Worker " + getLocalName() + "] SUCCES skill " + skillToApply + " sur P-" + currentProduct.getId());
+                                myAgent.addBehaviour(new ManagerBehaviour(currentProduct));
+                            } else {
+                                currentProduct.addFailure();
+                                System.out.println("!!! [Worker " + getLocalName() + "] ECHEC skill " + skillToApply + " sur P-" + currentProduct.getId() + " -> Retour file");
+                                productQueue.add(0, currentProduct);
+                            }
                             isWorking = false;
                         }
                     });

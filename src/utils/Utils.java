@@ -7,10 +7,12 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Utils {
     private static Random rnd = new Random();
-
+    public static AtomicInteger totalMessages = new AtomicInteger(0);
+    
     public static AID getRandomRobot(Agent myAgent) {
         DFAgentDescription template = new DFAgentDescription();
         ServiceDescription sd = new ServiceDescription();

@@ -1,17 +1,23 @@
 package model;
 
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 public class Product implements Serializable {
     private String id;
     private HashMap<String, Boolean> requiredSkills;
+    private long startTime;
 
+    private int nbFailures = 0;
+    
+    
     public Product(String id, int totalAvailableSkills, int skillsNeeded) {
         this.id = id;
+        this.startTime = System.currentTimeMillis();
+
         this.requiredSkills = new HashMap<>();
         List<Integer> allSkills = new ArrayList<>();
         for (int i = 0; i < totalAvailableSkills; i++) {
@@ -22,7 +28,7 @@ public class Product implements Serializable {
             this.requiredSkills.put(String.valueOf(allSkills.get(i)), false);
         }
     }
-
+    
     public boolean isFinished() {
         return !requiredSkills.containsValue(false);
     }
@@ -33,7 +39,7 @@ public class Product implements Serializable {
         }
         return null;
     }
-
+    
     public void setSkillDone(String skill) {
         if (requiredSkills.containsKey(skill)) {
             requiredSkills.put(skill, true);
@@ -41,4 +47,10 @@ public class Product implements Serializable {
     }
     
     public String getId() { return id; }
+    
+    public long getStartTime() { return startTime; }
+
+    public void addFailure() { this.nbFailures++; }
+    
+    public int getFailures() { return nbFailures; }
 }

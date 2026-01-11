@@ -16,6 +16,9 @@ public class AtelierAgent extends Agent {
     private int productCount = 0;
     private Random rnd = new Random();
 
+    private int totalFailuresGlobal = 0;
+    private int finishedProductsCount = 0;
+
     protected void setup() {
         Object[] args = getArguments();
         if (args != null && args.length >= 2) {
@@ -44,6 +47,7 @@ public class AtelierAgent extends Agent {
                 msg.addReceiver(randomRobot);
                 try {
                     msg.setContentObject(p);
+                    Utils.totalMessages.incrementAndGet();
                     send(msg);
                     System.out.println("Atelier : Produit " + p.getId() + " envoyé à " + randomRobot.getLocalName());
                 } catch (IOException e) { e.printStackTrace(); }
@@ -59,7 +63,22 @@ public class AtelierAgent extends Agent {
                 try {
                     Product p = (Product) msg.getContentObject();
                     if(p.isFinished()) {
-                        System.out.println("--- PRODUIT FINI : " + p.getId() + " reçu de " + msg.getSender().getLocalName() + " ---");
+                        // MISE A JOUR DES STATS
+                        finishedProductsCount++;
+                        totalFailuresGlobal += p.getFailures();
+                        double avgFailures = (finishedProductsCount > 0) ? (double) totalFailuresGlobal / finishedProductsCount : 0.0;
+                        
+                        long duration = System.currentTimeMillis() - p.getStartTime();
+                        
+                        // AFFICHAGE COMPLET
+                        System.out.println("--------------------------------------------------");
+                        System.out.println("--- PRODUIT FINI : " + p.getId() + " ---");
+                        System.out.println("   > Reçu de          : " + msg.getSender().getLocalName());
+                        System.out.println("   > Temps écoulé     : " + duration + " ms");
+                        System.out.println("   > Échecs sur ce P  : " + p.getFailures());
+                        System.out.println("   > Moyenne Échecs   : " + String.format("%.2f", avgFailures));
+                        System.out.println("   > Total Messages   : " + Utils.totalMessages.get());
+                        System.out.println("--------------------------------------------------");
                     }
                 } catch (Exception e) { e.printStackTrace(); }
             } else {
