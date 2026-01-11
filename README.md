@@ -4,12 +4,10 @@
 
 Un projet de système multi-agents (SMA) développé dans le cadre du cursus M1 Informatique.
 
-## Installation
+## Auteurs
 
-```bash
-git clone <repository-url>
-cd git_repo
-```
+- Hadjer CHEDJARI EL MEUR
+- Etienne BOSSU
 
 ## Utilisation
 
@@ -39,8 +37,3 @@ git_repo/
 ## Prérequis
 
 - Java
-
-## Auteurs
-
-- Hadjer CHEDJARI EL MEUR
-- Etienne BOSSU
