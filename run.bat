@@ -1,51 +1,37 @@
 @echo off
-pushd "%~dp0"
+setlocal enabledelayedexpansion
+:: On se place proprement dans le dossier du script meme s'il y a des espaces
+cd /d "%~dp0"
 
-echo [INFO] Configuration...
-
-REM 
-REM 
-set JAVA_HOME=C:\Program Files\Java\jdk-19
-
-if not exist "%JAVA_HOME%\bin\javac.exe" (
-    echo [ERREUR] JDK introuvable dans %JAVA_HOME%
+:: Verification de Java
+where javac >nul 2>nul
+if !errorlevel! neq 0 (
+    echo [!] Erreur : 'javac' est introuvable. Verifie ton PATH.
     pause
     exit /b
 )
 
-set JAVAC_CMD="%JAVA_HOME%\bin\javac.exe"
-set JAVA_CMD="%JAVA_HOME%\bin\java.exe"
+:: Parametres par defaut
+set "NB=%~1"
+if "!NB!"=="" set "NB=3"
+set "L1=%~2"
+if "!L1!"=="" set "L1=1000"
+set "L2=%~3"
+if "!L2!"=="" set "L2=2000"
+set "L3=%~4"
+if "!L3!"=="" set "L3=500"
 
-REM 
-set NB_ROBOTS=3
-set LAMBDA1=1000
-set LAMBDA2=2000
-set LAMBDA3=500
-
-REM 
 if not exist classes mkdir classes
 
-REM 
-echo [INFO] Entree dans le dossier src...
-cd src
+echo [INFO] Compilation des sources en cours...
+javac -d classes -cp "lib\jade.jar" src\Main.java src\agents\*.java src\model\*.java src\utils\*.java
 
-echo [INFO] Compilation en cours...
-REM 
-REM
-
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERREUR] La compilation a echoue.
-    cd ..
-    pause
-    exit /b
+if !errorlevel! equ 0 (
+    echo.
+    echo [OK] Lancement de JADE - Robots : !NB!
+    java -cp "lib\jade.jar;classes" Main !NB! !L1! !L2! !L3!
+) else (
+    echo [X] Erreur : La compilation a echoue.
 )
-
-REM 
-cd ..
-
-REM 
-echo [INFO] Lancement de la simulation...
-REM 
-%JAVA_CMD% -cp "lib\jade.jar;classes" Main %NB_ROBOTS% %LAMBDA1% %LAMBDA2% %LAMBDA3%
 
 pause

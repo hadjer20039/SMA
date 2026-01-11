@@ -1,23 +1,20 @@
 @echo off
-echo [INFO] Generation de la Javadoc...
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
 
-REM --- CONFIGURATION ---
-REM On s'assure que le dossier de sortie existe
+:: Verification que javadoc est accessible
+where javadoc >nul 2>nul
+if !errorlevel! neq 0 (
+    echo [!] Erreur : 'javadoc' est introuvable. Verifie ton PATH.
+    pause
+    exit /b
+)
+
 if not exist javadoc mkdir javadoc
 
-REM --- LOCALISATION DU JDK (Comme dans run.bat) ---
-set JAVA_HOME=C:\Program Files\Java\jdk-19
-set JAVADOC_CMD="%JAVA_HOME%\bin\javadoc.exe"
-
-REM --- EXECUTION ---
-REM Options expliquées :
-REM -d javadoc : dossier de sortie
-REM -cp ... : inclure JADE pour ne pas avoir d'erreurs
-REM -private : inclure meme les methodes privees (utile pour ton rapport)
-REM -encoding UTF-8 : pour gérer les accents
-REM -author -version : inclure les tags @author et @version
-
-%JAVADOC_CMD% -d javadoc ^
+echo Generation de la documentation (Javadoc)...
+:: Generation
+javadoc -d javadoc ^
     -cp "lib\jade.jar" ^
     -encoding UTF-8 -charset UTF-8 ^
     -private ^
@@ -25,11 +22,10 @@ REM -author -version : inclure les tags @author et @version
     -windowtitle "Documentation SMA Atelier" ^
     src\Main.java src\agents\*.java src\model\*.java src\utils\*.java
 
-if %ERRORLEVEL% EQU 0 (
-    echo [SUCCES] Documentation generee dans le dossier 'javadoc' !
-    echo Ouvrez 'javadoc\index.html' pour la consulter.
+if !errorlevel! equ 0 (
+    echo.
+    echo [OK] Documentation generee dans le dossier 'javadoc'.
 ) else (
-    echo [ERREUR] Echec de la generation.
+    echo [X] Erreur lors de la generation.
 )
-
 pause
