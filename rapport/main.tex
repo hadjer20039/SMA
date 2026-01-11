@@ -1,0 +1,659 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages essentiels
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{float}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usepackage{enumitem}
+
+% Configuration
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+
+% Listings Java
+\lstset{
+    language=Java,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green!50!black}\itshape,
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    breaklines=true,
+    xleftmargin=15pt
+}
+
+% Hyperref
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=cyan,
+    pdftitle={Rapport JADE - Systèmes Multi-Agents}
+}
+
+% En-tête
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Système Multi-Agents - JADE}
+\fancyhead[R]{M1 Informatique}
+\fancyfoot[C]{\thepage}
+
+\usetikzlibrary{positioning,shapes,arrows}
+
+\begin{document}
+
+% PAGE DE TITRE
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Large \textbf{Université de Caen Normandie}}\\[0.5cm]
+    {\large Département d'Informatique}\\[0.5cm]
+    {\large M1 Informatique - SMINF1F5}\\[2.5cm]
+    
+    {\Huge \textbf{Système Multi-Agents}}\\[0.5cm]
+    {\Huge \textbf{de Production Robotisée}}\\[1cm]
+    {\LARGE avec JADE}\\[3cm]
+    
+    {\Large \textbf{Contract Net Protocol}}\\
+    {\Large Ordonnancement Décentralisé}\\[2cm]
+    
+    \begin{tabular}{ll}
+        \textbf{Auteurs} : & Hadjer CHEDJARI EL MEUR \\ & Etienne BOSSU \\
+        \textbf{Encadrant} : & Grégory Bonnet \\
+        \textbf{Date} : & Janvier 2026 \\
+    \end{tabular}
+    
+    \vfill
+    
+    {\large Systèmes Multi-Agents}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ============= SECTION 1: INTRODUCTION =============
+\section{Introduction}
+
+\subsection{Contexte}
+
+Ce projet s'inscrit dans l'unité SMINF1F5 "Systèmes Multi-Agents" et vise à implémenter une solution décentralisée à un problème d'ordonnancement dans un atelier de production automatisé utilisant la plateforme JADE.
+
+\subsection{Objectifs}
+
+\begin{itemize}
+    \item Implémenter une solution \textbf{décentralisée} au problème d'ordonnancement
+    \item Adapter le \textbf{Contract Net Protocol} pour l'allocation de tâches
+    \item Coordonner des agents autonomes via négociation par enchères
+    \item Optimiser l'utilisation des ressources (robots)
+\end{itemize}
+
+\subsection{Problématique}
+
+Des robots aux compétences diverses doivent collaborer pour fabriquer des produits, en gérant :
+\begin{itemize}
+    \item L'arrivée des produits
+    \item La variabilité des compétences
+    \item Les possibles échecs d'exécution
+    \item Les files d'attente de chaque robot
+\end{itemize}
+
+% ============= SECTION 2: ANALYSE =============
+\section{Analyse du Problème}
+
+\subsection{Contraintes du Système}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|c|p{7cm}|c|}
+\hline
+\textbf{\#} & \textbf{Contrainte} & \textbf{Statut} \\
+\hline
+1 & 1 agent Atelier et $m$ agents Robots & \checkmark \\
+2 & $N$ compétences distinctes & \checkmark \\
+3 & Arrivée produit $\in [\lambda_1, \lambda_2]$ & \checkmark \\
+4 & Chaque produit nécessite $N_j$ compétences & \checkmark \\
+5 & Robots avec $S_i$ compétences, $p_{s_i,k} \in ]0,1[$ & \checkmark \\
+6 & Robots peuvent partager compétences & \checkmark \\
+7 & Probabilité $p_{s_i,k}$ de succès & \checkmark \\
+8 & Robot qui échoue recommence & \checkmark \\
+9 & Un robot = un produit à la fois & \checkmark \\
+10 & File d'attente possible & \checkmark \\
+11 & Communication non bloquante & \checkmark \\
+12 & Pas de traitement simultané & \checkmark \\
+\hline
+\end{tabular}
+\caption{État d'implémentation (\checkmark = Implémenté, $\times$ = Non implémenté)}
+\end{table}
+
+\subsection{Paramètres}
+
+\begin{itemize}
+    \item $m$ : Nombre de robots (défaut : 3)
+    \item $N$ : Compétences disponibles (5)
+    \item $N_j$ : Compétences par produit (3)
+    \item $S_i$ : Compétences par robot (3)
+    \item $\lambda_1, \lambda_2$ : Intervalle génération (1000-2000ms)
+    \item $\lambda_3$ : Temps exécution (500ms)
+    \item $p_{s_i,k}$ : Probabilité succès $\in [0.5, 1.0]$
+\end{itemize}
+
+\subsection{Contract Protocol}
+
+\begin{enumerate}
+    \item \textbf{Génération} : Atelier $\to$ robot aléatoire
+    \item \textbf{Enchère} : Robot lance CFP pour compétence manquante
+    \item \textbf{Soumission} : Robots qualifiés proposent makespan
+    \item \textbf{Attribution} : Sélection minimum
+    \item \textbf{Exécution} : Robot gagnant traite
+    \item \textbf{Itération} : Jusqu'à complétion
+    \item \textbf{Retour} : Produit fini $\to$ atelier
+\end{enumerate}
+
+% ============= SECTION 3: CONCEPTION =============
+\section{Choix de Conception}
+
+\subsection{Représentation des Produits}
+
+\textbf{Classe Product :}
+\begin{lstlisting}
+public class Product implements Serializable {
+    private String id;
+    private HashMap<String, Boolean> requiredSkills;
+    
+    // Methodes: isFinished(), getNextMissingSkill(), 
+    //           setSkillDone(skill)
+}
+\end{lstlisting}
+
+\textbf{Justification :}
+\begin{itemize}
+    \item HashMap flexible pour suivi d'état
+    \item Serializable pour transmission ACL
+    \item Génération aléatoire de 3/5 compétences
+\end{itemize}
+
+\subsection{Représentation des Compétences}
+
+Format : Chaînes \texttt{"0"} à \texttt{"4"} pour $N=5$.
+
+Stockage robot :
+\begin{lstlisting}
+HashMap<String, Double> skills; // skill -> p_{s_i,k}
+\end{lstlisting}
+
+Enregistrement DF :
+\begin{itemize}
+    \item Service général : \texttt{"robot-service"}
+    \item Services spécifiques : \texttt{"skill-0"} à \texttt{"skill-4"}
+\end{itemize}
+
+\subsection{Behaviours et Justification des Choix}
+
+Le choix des types de comportements est crucial pour assurer la réactivité des agents et la simulation du temps.
+
+\subsection{Justification des Behaviours}
+
+\subsubsection{AtelierAgent}
+\begin{description}
+    \item[\texttt{GenerateProductBehaviour} (WakerBehaviour)] \hfill \\
+    Utilisé pour introduire un délai aléatoire $[\lambda_1, \lambda_2]$ avant chaque création de produit. L'agent se reprogramme lui-même à la fin pour créer une boucle de génération infinie.
+
+    \item[\texttt{ReceiveFinishedProductBehaviour} (CyclicBehaviour)] \hfill \\
+    Permet une écoute permanente et non-bloquante de la boîte aux lettres. Indispensable pour récupérer les produits finis dès qu'ils arrivent, quel que soit le moment.
+\end{description}
+
+\subsubsection{RobotAgent}
+\begin{description}
+    \item[\texttt{ReceiveNewProductBehaviour} \& \texttt{ResponderBehaviour} (CyclicBehaviour)] \hfill \\
+    Assurent la réactivité du robot. Ils tournent en boucle pour intercepter immédiatement les nouveaux produits (INFORM) ou les appels d'offres (CFP) sans jamais s'arrêter.
+
+    \item[\texttt{ManagerBehaviour} (OneShotBehaviour)] \hfill \\
+    Lancé uniquement "à la demande" quand une compétence manque. Il effectue une action ponctuelle (lancer l'enchère et contacter le DF) puis se détruit immédiatement pour libérer des ressources.
+
+    \item[\texttt{CollectProposalsBehaviour} (WakerBehaviour)] \hfill \\
+    Agit comme un "Timer" pour l'enchère. Il attend exactement 1500ms (le temps de laisser les autres répondre), puis se déclenche une seule fois pour dépouiller les votes et choisir le vainqueur.
+
+    \item[\texttt{WorkerBehaviour} (TickerBehaviour)] \hfill \\
+    S'exécute périodiquement (toutes les 200ms) pour vérifier la file d'attente et faire avancer le travail. Contrairement à une boucle \texttt{while} qui bloquerait l'agent, ce "battement de cœur" permet au robot de continuer à recevoir des messages pendant qu'il travaille.
+\end{description}
+
+\subsection{Calcul du Makespan}
+
+\textbf{Formule théorique :}
+\begin{equation}
+\text{makespan} = \sum_{\text{produits}} \lambda_3 \times (1 + E), \quad E = \frac{1 - p_{s_i,k}}{p_{s_i,k}}
+\end{equation}
+
+\textbf{Implémentation :}
+Nous utilisons la formule de l'espérance d'une loi géométrique pour estimer le temps réel incluant les échecs potentiels :
+\begin{lstlisting}
+double E = (1.0 - prob) / prob;
+// Temps espere = temps nominal * (1 + nb_echecs_moyens)
+totalTime += lambda3 * (1.0 + E);
+\end{lstlisting}
+
+% ============= SECTION 4: COMMUNICATION =============
+\section{Protocole de Communication}
+
+\subsection{Messages FIPA-ACL}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Performative} & \textbf{De} & \textbf{Vers} & \textbf{Contenu} \\
+\hline
+INFORM & Atelier & Robot & Produit \\
+INFORM & Robot & Atelier & Produit fini \\
+CFP & Manager & Workers & "skill-X" \\
+PROPOSE & Worker & Manager & makespan \\
+ACCEPT\_PROPOSAL & Manager & Winner & Product \\
+\hline
+\end{tabular}
+\caption{Messages utilisés}
+\end{table}
+
+\subsection{ConversationId}
+
+Format : \texttt{"nego-" + productId}
+
+Exemple : \texttt{"nego-P-1"}, \texttt{"nego-P-2"}
+
+\subsection{MessageTemplate}
+
+\begin{lstlisting}
+// Filtrage par performative
+MessageTemplate.MatchPerformative(ACLMessage.CFP)
+
+// Filtrage combine
+MessageTemplate.and(
+    MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
+    MessageTemplate.MatchConversationId("nego-P-5")
+)
+\end{lstlisting}
+
+% ============= SECTION 5: IMPLEMENTATION =============
+\section{Implémentation Détaillée}
+
+\subsection{AtelierAgent}
+
+\subsubsection{Attributs}
+\begin{lstlisting}
+private long lambda1 = 1000, lambda2 = 2000;
+private int productCount = 0;
+private Random rnd = new Random();
+\end{lstlisting}
+
+\subsubsection{GenerateProductBehaviour}
+
+\textbf{Algorithme :}
+\begin{enumerate}
+    \item Créer Product("P-\{++count\}", 5, 3)
+    \item Trouver robot aléatoire via DF
+    \item Envoyer INFORM avec product
+    \item Réactiver après délai $\in [\lambda_1, \lambda_2]$
+\end{enumerate}
+
+\begin{lstlisting}
+protected void onWake() {
+    Product p = new Product("P-" + (++productCount), 5, 3);
+    AID robot = Utils.getRandomRobot(myAgent);
+    
+    ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+    msg.addReceiver(robot);
+    msg.setContentObject(p);
+    send(msg);
+    
+    myAgent.addBehaviour(new GenerateProductBehaviour(
+        myAgent, getRandomTime()));
+}
+\end{lstlisting}
+
+\subsection{RobotAgent}
+
+\subsubsection{Initialisation}
+
+\begin{lstlisting}
+protected void setup() {
+    // 1. Recuperer lambda3
+    lambda3 = Long.parseLong((String)args[0]);
+    
+    // 2. Generer 3 competences aleatoires
+    for(int i=0; i<3; i++) {
+        int skillId = (int)(Math.random() * 5);
+        skills.put(String.valueOf(skillId), 
+                   0.5 + Math.random() * 0.5);
+    }
+    
+    // 3. Enregistrer au DF
+    DFService.register(this, createDFD());
+    
+    // 4. Lancer behaviours
+    addBehaviour(new ReceiveNewProductBehaviour());
+    addBehaviour(new ResponderBehaviour());
+    addBehaviour(new WorkerBehaviour());
+}
+\end{lstlisting}
+
+\subsubsection{ManagerBehaviour}
+
+\textbf{Algorithme :}
+\begin{enumerate}
+    \item Obtenir skill = product.getNextMissingSkill()
+    \item Si skill == null : INFORM $\to$ Atelier, RETURN
+    \item Rechercher robots avec "skill-X" dans DF
+    \item Envoyer CFP à tous
+    \item Lancer CollectProposalsBehaviour
+\end{enumerate}
+
+\begin{lstlisting}
+public void action() {
+    String skill = product.getNextMissingSkill();
+    if (skill == null) {
+        // Renvoyer a l'atelier
+        sendINFORM(atelier, product);
+        return;
+    }
+    
+    DFAgentDescription[] robots = searchDF("skill-" + skill);
+    sendCFP(robots, "skill-" + skill, "nego-" + product.getId());
+    addBehaviour(new CollectProposalsBehaviour(...));
+}
+\end{lstlisting}
+
+\subsubsection{CollectProposalsBehaviour}
+
+\begin{lstlisting}
+protected void onWake() {
+    MessageTemplate mt = and(
+        MatchPerformative(PROPOSE),
+        MatchConversationId(conversationId)
+    );
+    
+    ACLMessage best = null;
+    double bestTime = Double.MAX_VALUE;
+    
+    while ((msg = receive(mt)) != null) {
+        double time = Double.parseDouble(msg.getContent());
+        if (time < bestTime) {
+            bestTime = time;
+            best = msg;
+        }
+    }
+    
+    if (best != null) {
+        sendACCEPT_PROPOSAL(best.getSender(), product);
+    }
+}
+\end{lstlisting}
+
+\subsubsection{ResponderBehaviour}
+
+\begin{lstlisting}
+public void action() {
+    ACLMessage msg = receive(cfpOrAccept);
+    
+    if (msg.getPerformative() == CFP) {
+        double mk = calculateMakespan();
+        sendPROPOSE(msg.getSender(), mk);
+    } 
+    else if (msg.getPerformative() == ACCEPT_PROPOSAL) {
+        Product p = (Product) msg.getContentObject();
+        productQueue.add(p);
+    }
+}
+\end{lstlisting}
+
+\subsubsection{WorkerBehaviour}
+
+\begin{lstlisting}
+protected void onTick() {
+    if (!isWorking && !productQueue.isEmpty()) {
+        // Recuperation du produit en tete de file
+        Product currentProduct = productQueue.remove(0); 
+        String skillToApply = currentProduct.getNextMissingSkill();
+        
+        if (skills.containsKey(skillToApply)) {
+            isWorking = true;
+            
+            // Simulation du temps de travail
+            myAgent.addBehaviour(new WakerBehaviour(myAgent, lambda3) {
+                protected void onWake() {
+                    double prob = skills.get(skillToApply);
+                    
+                    // GESTION DE L'ECHEC (Loi de Bernoulli)
+                    if (Math.random() < prob) {
+                        // SUCCES : On valide et on passe a la suite
+                        currentProduct.setSkillDone(skillToApply);
+                        myAgent.addBehaviour(new ManagerBehaviour(currentProduct));
+                    } else {
+                        // ECHEC : Reinsertion prioritaire (index 0)
+                        productQueue.add(0, currentProduct);
+                    }
+                    isWorking = false;
+                }
+            });
+        }
+    }
+}
+\end{lstlisting}
+\subsection{Suivi des Statistiques}
+
+Pour répondre aux exigences de suivi des performances (nombre moyen d'échecs et charge réseau), nous avons instrumenté le code de la manière suivante :
+
+\subsubsection{Métriques d'Échec}
+Le nombre d'échecs est une propriété intrinsèque à la complexité de réalisation d'un produit. Nous avons donc choisi d'encapsuler cette donnée directement dans la classe \texttt{Product}.
+
+\begin{itemize}
+    \item Chaque produit possède un compteur \texttt{nbFailures} initialisé à 0.
+    \item Lors d'un échec dans le \texttt{WorkerBehaviour} du robot, la méthode \texttt{product.addFailure()} est appelée avant la réinsertion dans la file.
+    \item À la réception du produit fini, l'\texttt{AtelierAgent} agrège ces données pour calculer une moyenne glissante :
+    \[ \text{Moyenne} = \frac{\sum \text{Échecs}}{\text{Nombre Produits Finis}} \]
+\end{itemize}
+
+\subsubsection{Charge Réseau (Nombre de Messages)}
+Pour quantifier les échanges du protocole Contract Net, nous utilisons un compteur statique thread-safe (\texttt{AtomicInteger}) partagé via la classe \texttt{Utils}.
+Bien que moins "purement" distribuée, cette approche est optimale pour une simulation s'exécutant au sein d'une même JVM, évitant la lourdeur d'un agent "Sniffer" dédié. Chaque appel à \texttt{send()} dans les agents incrémente ce compteur global, offrant une vue temps-réel de la charge de communication.
+
+\begin{lstlisting}[caption={Affichage des statistiques dans l'Atelier}]
+// Exemple de sortie console implementee
+System.out.println("> Moyenne Echecs : " + String.format("%.2f", avg));
+System.out.println("> Total Messages : " + Utils.totalMessages.get());
+\end{lstlisting}
+% ============= SECTION 6: DIAGRAMMES =============
+\section{Diagrammes}
+
+\subsection{Diagramme de Séquence}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=3.5cm] 
+    \node (atelier) {Atelier};
+    \node[right=of atelier] (r1) {Robot1};
+    \node[right=of r1] (r2) {Robot2};
+    \node[right=of r2] (r3) {Robot3};
+    
+    \draw[->, thick] (atelier) -- node[above, font=\footnotesize] {INFORM} (r1);
+    
+    \draw[->, thick] (r1) -- node[above, pos=0.3, font=\footnotesize] {CFP} (r2);
+    \draw[->, thick] (r1) to[bend right=20] node[below, pos=0.3, font=\footnotesize] {CFP} (r3);
+    
+    \draw[<-, thick] (r1) to[bend left=20] node[above, font=\footnotesize] {PROPOSE} (r2);
+    \draw[<-, thick] (r1) to[bend right=40] node[below, font=\footnotesize] {PROPOSE} (r3);
+    
+    \draw[->, thick] (r1) -- node[below, pos=0.8, font=\footnotesize] {ACCEPT} (r2);
+\end{tikzpicture}
+\caption{Flux de communication simplifié}
+\end{figure}
+
+\subsection{Diagramme d'États RobotAgent}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=3.5cm, 
+    auto,
+    state/.style={circle, draw, minimum size=2cm, align=center}
+]
+    \node[state] (idle) {IDLE};
+    \node[state, below=of idle] (managing) {MANAGING};
+    \node[state, right=of managing] (collecting) {COLLECTING};
+    \node[state, below=of managing] (working) {WORKING};
+    
+    \draw[->] (idle) -- node[left] {Reçoit} (managing);
+    \draw[->] (managing) -- node[above] {CFP} (collecting);
+    \draw[->] (collecting) |- node[near start, right] {Timeout} (idle);
+    \draw[->] (idle) to[bend right=45] node[left] {Job} (working);
+    \draw[->] (working) -- node[right] {Fini} (managing);
+\end{tikzpicture}
+\caption{États principaux d'un RobotAgent}
+\end{figure}
+
+% ============= SECTION 7: UTILISATION =============
+\section{Guide d'Utilisation}
+
+\subsection{Compilation}
+
+\begin{lstlisting}[language=bash]
+javac -cp "jade.jar:." Main.java agents/*.java \
+      model/*.java utils/*.java
+\end{lstlisting}
+
+\subsection{Exécution}
+
+\textbf{Défaut (3 robots) :}
+\begin{lstlisting}[language=bash]
+java -cp "jade.jar:." Main
+\end{lstlisting}
+
+\textbf{Personnalisé :}
+\begin{lstlisting}[language=bash]
+java -cp "jade.jar:." Main [nbRobots] [lambda1] [lambda2] [lambda3]
+\end{lstlisting}
+
+\textbf{Exemples :}
+\begin{lstlisting}[language=bash]
+# 5 robots
+java -cp "jade.jar:." Main 5
+
+# 4 robots, parametres temporels
+java -cp "jade.jar:." Main 4 2000 5000 1000
+\end{lstlisting}
+
+\subsection{Script de Lancement}
+
+\textbf{launch.sh (Linux/Mac) :}
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+ROBOTS=${1:-3}
+LAMBDA1=${2:-1000}
+LAMBDA2=${3:-2000}
+LAMBDA3=${4:-500}
+
+java -cp "jade.jar:." Main $ROBOTS $LAMBDA1 $LAMBDA2 $LAMBDA3
+\end{lstlisting}
+
+\textbf{Utilisation :}
+\begin{lstlisting}[language=bash]
+chmod +x launch.sh
+./launch.sh 5 2000 4000 1000
+\end{lstlisting}
+
+\subsection{Sorties Console}
+
+\begin{lstlisting}
+Robot Robot1 pret. Skills: [0, 2, 4]
+Robot Robot2 pret. Skills: [1, 3, 4]
+Atelier Atelier pret.
+Atelier : Produit P-1 envoye a Robot2
+>>> [Manager Robot2] Enchere pour Produit P-1 (Skill 1)...
++++ [Manager Robot2] Vainqueur pour P-1 est Robot2
+VVV [Worker Robot2] J ai gagne le job P-1. File: 1
+... [Worker Robot2] Travail en cours sur P-1 (Skill 1)
+*** [Worker Robot2] FINI skill 1 sur P-1
+--- PRODUIT FINI : P-1 recu de Robot3 ---
+\end{lstlisting}
+
+% ============= SECTION 8: ANALYSE CRITIQUE =============
+\section{Écarts et Améliorations}
+
+\subsection{Points Forts}
+
+\begin{itemize}
+    \item Décentralisation complète
+    \item Scalabilité (ajout robots facile)
+    \item Utilisation correcte des behaviours JADE
+    \item Protocole Contract Net adapté
+    \item Gestion files d'attente
+\end{itemize}
+
+\subsection{Améliorations Possibles}
+
+\begin{itemize}
+    \item Implémenter probabilité d'échec
+    \item Calcul makespan précis
+    \item Timeout adaptatif (CollectProposals)
+    \item Statistiques temps réel
+    \item Interface graphique
+    \item Métriques performance
+\end{itemize}
+
+% ============= SECTION 9: CONCLUSION =============
+\section{Conclusion}
+
+Ce projet a permis de mettre en œuvre un système multi-agents décentralisé pour l'ordonnancement de production. L'utilisation de JADE et du Contract Net Protocol a démontré l'efficacité de la coordination par enchères.
+
+\subsection{Apprentissages}
+
+\begin{itemize}
+    \item Maîtrise de JADE et ses behaviours
+    \item Protocoles de négociation FIPA-ACL
+    \item Coordination distribuée
+    \item Directory Facilitator
+    \item Communication asynchrone
+\end{itemize}
+
+\subsection{Perspectives}
+
+\begin{itemize}
+    \item Optimisation multi-critères
+    \item Tolérance aux pannes
+    \item Apprentissage adaptatif
+    \item Benchmarking performance
+\end{itemize}
+
+% BIBLIOGRAPHIE
+\begin{thebibliography}{9}
+\bibitem{jade} 
+Bellifemine, F., Caire, G., \& Greenwood, D. (2007). 
+\textit{Developing Multi-Agent Systems with JADE}. 
+Wiley.
+
+\bibitem{fipa}
+FIPA (2002).
+\textit{FIPA Contract Net Interaction Protocol Specification}.
+Foundation for Intelligent Physical Agents.
+
+\bibitem{wooldridge}
+Wooldridge, M. (2009).
+\textit{An Introduction to MultiAgent Systems}.
+Wiley.
+\end{thebibliography}
+
+\end{document}
