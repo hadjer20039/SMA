@@ -8,7 +8,7 @@ echo "[INFO] Génération de la Javadoc..."
 javadoc -d javadoc \
     -cp "lib/jade.jar" \
     -encoding UTF-8 -charset UTF-8 \
-    -private \
+    -protected \
     -author -version \
     -windowtitle "Documentation SMA Atelier" \
     src/Main.java src/agents/*.java src/model/*.java src/utils/*.java
