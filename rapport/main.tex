@@ -393,58 +393,15 @@ Pour mesurer la charge réseau sans surcharger le système, nous utilisons un \t
 \end{itemize}
 
 
-% ============= SECTION 6: DIAGRAMMES =============
-\section{Diagrammes}
-
-\subsection{Diagramme de Séquence}
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[node distance=3.5cm] 
-    \node (atelier) {Atelier};
-    \node[right=of atelier] (r1) {Robot1};
-    \node[right=of r1] (r2) {Robot2};
-    \node[right=of r2] (r3) {Robot3};
-    
-    \draw[->, thick] (atelier) -- node[above, font=\footnotesize] {INFORM} (r1);
-    
-    \draw[->, thick] (r1) -- node[above, pos=0.3, font=\footnotesize] {CFP} (r2);
-    \draw[->, thick] (r1) to[bend right=20] node[below, pos=0.3, font=\footnotesize] {CFP} (r3);
-    
-    \draw[<-, thick] (r1) to[bend left=20] node[above, font=\footnotesize] {PROPOSE} (r2);
-    \draw[<-, thick] (r1) to[bend right=40] node[below, font=\footnotesize] {PROPOSE} (r3);
-    
-    \draw[->, thick] (r1) -- node[below, pos=0.8, font=\footnotesize] {ACCEPT} (r2);
-\end{tikzpicture}
-
-\caption{Flux de communication simplifié}
-
+% ============= SECTION 6: DIAGRAMME =============
+\section{Diagramme de Séquence}
+\begin{figure}[H] 
+    \centering
+        \includegraphics[width=0.75\linewidth]{diagramme.png}
+    \caption{Diagramme de séquence du protocole de négociation}
+    \label{fig:seq_diag}
 \end{figure}
-
-\subsection{Diagramme d'États RobotAgent}
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}[
-    node distance=3.5cm, 
-    auto,
-    state/.style={circle, draw, minimum size=2cm, align=center}
-]
-    \node[state] (idle) {IDLE};
-    \node[state, below=of idle] (managing) {MANAGING};
-    \node[state, right=of managing] (collecting) {COLLECTING};
-    \node[state, below=of managing] (working) {WORKING};
-    
-    \draw[->] (idle) -- node[left] {Reçoit} (managing);
-    \draw[->] (managing) -- node[above] {CFP} (collecting);
-    \draw[->] (collecting) |- node[near start, right] {Timeout} (idle);
-    \draw[->] (idle) to[bend right=45] node[left] {Job} (working);
-    \draw[->] (working) -- node[right] {Fini} (managing);
-\end{tikzpicture}
-\caption{États principaux d'un RobotAgent}
-\end{figure}
-
-
+Le schéma ci dessus résume le scénario nominal de communication : l'Atelier lance la production et les robots utilisent des appels d'offres (CFP) pour se répartir le travail étape par étape.
 
 % ============= SECTION 7: UTILISATION =============
 \section{Guide d'Utilisation}
